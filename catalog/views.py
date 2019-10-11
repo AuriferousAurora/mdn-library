@@ -1,5 +1,4 @@
-from django.contrib.auth.decorators import user_passes_test
-from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.shortcuts import render
 from django.views import generic
 
@@ -72,13 +71,10 @@ class LoanedBooksByUserListView(LoginRequiredMixin, generic.ListView):
     return BookInstance.objects.filter(borrower=self.request.user).filter(status__exact='o').order_by('due_back')
 
 
-def user_is_librarian(user):
-  return user.groups.filter(name='Library Staff').exists()
-
-@user_passes_test(user_is_librarian)
-class AllLoanedBooksListView(generic.ListView):
+class AllLoanedBooksListView(PermissionRequiredMixin, generic.ListView):
+  permission_required = 'catalog.can_mark_returned'
   model = BookInstance
-  template_name ='catalog/users_borrowed_books.html'
+  template_name ='catalog/all_loaned_books.html'
   
   def get_queryset(self):
     return BookInstance.objects.filter(status__exact='o').order_by('due_back')
