@@ -1,3 +1,5 @@
+from django.contrib.auth.decorators import user_passes_test
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django.shortcuts import render
 from django.views import generic
 
@@ -13,6 +15,10 @@ def index(request):
   num_authors = Author.objects.count()
   harry_potter_books = Book.objects.filter(title__icontains='Harry Potter')
   num_harry_potter_books = harry_potter_books.count()
+
+  # Log the number of visits by current user.
+  num_visits = request.session.get('num_visits', 0)
+  request.session['num_visits'] = num_visits + 1
 
   num_harry_potter_books_available = 0
   for book in harry_potter_books:
@@ -32,6 +38,7 @@ def index(request):
     'num_authors': num_authors,
     'num_harry_potter_books': num_harry_potter_books,
     'num_harry_potter_books_available': num_harry_potter_books_available,
+    'num_visits': num_visits,
   }
 
   return render(request, 'index.html', context=context)
@@ -53,4 +60,26 @@ class AuthorListView(generic.ListView):
 
 class AuthorDetailView(generic.DetailView):
   model = Author
+
+
+class LoanedBooksByUserListView(LoginRequiredMixin, generic.ListView):
+  """Generic class-based view listing books on loan to current user."""
+  model = BookInstance
+  template_name ='catalog/users_borrowed_books.html'
+  paginate_by = 10
+
+  def get_queryset(self):
+    return BookInstance.objects.filter(borrower=self.request.user).filter(status__exact='o').order_by('due_back')
+
+
+def user_is_librarian(user):
+  return user.groups.filter(name='Library Staff').exists()
+
+@user_passes_test(user_is_librarian)
+class AllLoanedBooksListView(generic.ListView):
+  model = BookInstance
+  template_name ='catalog/users_borrowed_books.html'
+  
+  def get_queryset(self):
+    return BookInstance.objects.filter(status__exact='o').order_by('due_back')
 
